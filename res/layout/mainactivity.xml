@@ -4,12 +4,33 @@
     android:layout_height="match_parent"
     android:orientation="vertical" >
     
-   <ImageView 
+    <Button 
+        android:id="@+id/load"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="load"/>
+    
+    <Button 
+        android:id="@+id/adjustWL"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="adjust W/L"/>
+    
+   
+    <TextView 
+        android:id="@+id/WLValue"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="W/L:0/0  Scale:0.00"/>
+    
+   <com.dcmViewer.widget.DicomView 
        android:id="@+id/dcmview"
        android:layout_width="fill_parent"
        android:layout_height="fill_parent"
        android:layout_gravity="center"
-       android:scaleType="matrix"
        android:src="@drawable/ic_launcher"
        android:contentDescription="This is a dcm"/>
     
