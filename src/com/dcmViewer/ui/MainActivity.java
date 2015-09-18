@@ -1,11 +1,13 @@
 package com.dcmViewer.ui;
 
+import java.awt.event.MouseEvent;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.IllegalFormatCodePointException;
 
 import com.dicomViewer.R;
 import com.dcmViewer.GestureDetector.MoveGestureDetector;
@@ -14,9 +16,11 @@ import com.dcmViewer.dicom.imageio.DicomImageReader;
 import com.dcmViewer.widget.DicomView;
 import com.imebra.dicom.*;
 
+import android.R.bool;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
@@ -40,23 +44,26 @@ public class MainActivity extends Activity implements OnTouchListener,
 
 	private float currentX;
 	private float currentY;
-	
+
 	private double lastFingerdis;
 	private double currentFingerdis;
 
 	private int windowCenter;
 	private int windowWidth;
 	private float Scale = 0.f;
+	private float currentScale = 0.f;
 	private int offestX;
 	private int offestY;
-    private Rect mScreenRect;
-	private Rect mImageRect;
-	private Rect mImageROIRect;
+	private Rect mScreenRect =  new Rect();
+	private Rect mImageRect  =  new Rect();
+	private Rect mImageROIRect=  new Rect();
 
 	private DicomImageReader mDicomImageReader;
 	private int[] imageBuffer;
 
 	private boolean isAdjustWL = false;
+	
+	private boolean isMove = false;
 
 	DicomView imageView;
 
@@ -77,6 +84,7 @@ public class MainActivity extends Activity implements OnTouchListener,
 		Button buttonadjustWL = (Button) findViewById(R.id.adjustWL);
 		buttonadjustWL.setOnClickListener(this);
 
+		
 		mDicomImageReader = new DicomImageReader();
 
 	}
@@ -97,23 +105,23 @@ public class MainActivity extends Activity implements OnTouchListener,
 			float ScaleY = (float) mScreenHeight
 					/ mDicomImageReader.getHeight();
 			Scale = ScaleX > ScaleY ? ScaleY : ScaleX;
+			currentScale = Scale;
 
 			mImageWidth = (int) (mDicomImageReader.getWidth() * Scale);
 			mImageHeight = (int) (mDicomImageReader.getHeight() * Scale);
 
 			imageBuffer = mDicomImageReader
 					.getBitmap(mImageWidth, mImageHeight);
-			
-			int top  = mImageWidth >= mScreenWidth ? 0 : (mScreenWidth-mImageWidth)/2; 
-			int left = mImageHeight >= mScreenHeight ? 0 : (mScreenHeight-mImageHeight)/2; 
+
+			int left = mImageWidth >= mScreenWidth ? 0
+					: (mScreenWidth - mImageWidth) / 2;
+			int top = mImageHeight >= mScreenHeight ? 0
+					: (mScreenHeight - mImageHeight) / 2;
 			mImageRect.set(left, top, left + mImageWidth, top + mImageHeight);
-		
+			mImageROIRect.set(mImageRect);
 
-	        imageView.setColors(imageBuffer);
-	        imageView.setDrawRect(top, left, mImageWidth, mImageHeight);
-	        
-	     
-
+			imageView.setColors(imageBuffer);
+			imageView.setDrawRect(top, left, mImageWidth, mImageHeight);
 			
 
 			displayWLS(windowWidth, windowCenter, Scale);
@@ -127,18 +135,131 @@ public class MainActivity extends Activity implements OnTouchListener,
 		windowCenter += nY;
 
 		imageBuffer = mDicomImageReader.applyWC(windowWidth, windowCenter);
-	
-		imageView.setColors(imageBuffer);
+
+		imageView.refreshColors(imageBuffer);
 
 		displayWLS(windowWidth, windowCenter, Scale);
 	}
+
+	/*
+	 * 移动
+	 */
+	private boolean move(int nX, int nY) {
+
+		if (mImageROIRect.top + nY > mScreenHeight
+				|| mImageROIRect.bottom + nY < 0
+				|| mImageROIRect.left + nX > mScreenWidth
+				|| mImageROIRect.right + nX < 0)
+			return false; // 边界检测
+
+		mImageRect.top += nY;
+		mImageRect.bottom += nY;
+		mImageRect.left += nX;
+		mImageRect.right += nX;
+
+		if (mImageRect.top < 0) {
+			mImageROIRect.top = 0;
+		} else {
+			mImageROIRect.top += nY;
+		}
+
+		if (mImageRect.bottom > mScreenHeight) {
+			mImageROIRect.bottom = mScreenHeight;
+		} else {
+			mImageROIRect.bottom += nY;
+		}
+
+		if (mImageRect.left < 0) {
+			mImageROIRect.left = 0;
+		} else {
+			mImageROIRect.left += nX;
+		}
+
+		if (mImageRect.right > mScreenWidth) {
+			mImageROIRect.right = mScreenWidth;
+		} else {
+			mImageROIRect.right += nX;
+		}
+
+		return true;
+	}
 	
-	private void move(int nX, int nY){
-		mImageRect.top     += nY;
-		mImageRect.bottom  += nY;
-		mImageRect.left    += nX;
-		mImageRect.right   += nX;
+	
+	/*
+	 * 缩放
+	 */
+	private boolean scale(float s){
+		if (currentScale == s)
+			return false;
 		
+		float difscale = currentScale-s;
+		float halfX = mImageRect.width()*difscale/2;
+		float halfY = mImageRect.height()*difscale/2;
+		
+		mImageRect.top     += halfY;
+		mImageRect.bottom  -= halfY;
+		mImageRect.left    += halfX;
+		mImageRect.right   -= halfX;
+		
+		if (mImageRect.top < 0) {
+			mImageROIRect.top = 0;
+		}else {
+			mImageROIRect.top += halfY;
+		}
+		
+		if (mImageRect.bottom > mScreenHeight) {
+			mImageROIRect.bottom = mScreenHeight;
+		}else {
+			mImageROIRect.bottom -= halfY;
+		}
+		
+		if (mImageRect.left < 0) {
+			mImageROIRect.left = 0;
+		}else {
+			mImageROIRect.left += halfX;
+		}
+		
+		if (mImageRect.right> mScreenWidth) {
+			mImageROIRect.right = mScreenWidth;
+		}else {
+			mImageROIRect.right -= halfX;
+		}
+		currentScale = s;
+		return true;
+	}
+	
+
+	/*
+	 * 刷新图像
+	 */
+	private void refreshBitmap() {
+		if (mScreenRect.contains(mImageROIRect)) {
+			imageView.setDrawRect(mImageROIRect.top, mImageROIRect.left,
+					mImageROIRect.width(), mImageROIRect.height());
+		} else {
+			Rect realImageROIRect = screenToimage(mImageRect, mImageROIRect);
+			imageBuffer = mDicomImageReader.resize(mImageRect.width(),
+					mImageRect.height(), realImageROIRect.left,
+					realImageROIRect.top, realImageROIRect.right,
+					realImageROIRect.bottom);
+			
+			imageView.setColors(imageBuffer);
+			imageView.setDrawRect(mImageROIRect.top, mImageROIRect.left, mImageROIRect.width(), mImageROIRect.height());
+		}
+	}
+
+	// 屏幕坐标映射到实际图像坐标
+	private Rect screenToimage(Rect imageRect, Rect imageROIRect) {
+
+		Rect rc = new Rect(0, 0, 0, 0);
+
+		rc.top = (int) (imageROIRect.top - imageRect.top);
+		rc.left = (int) (imageROIRect.left - imageRect.left);
+		rc.bottom = (int) (imageROIRect.bottom - imageRect.top);
+		rc.right = (int) (imageROIRect.right - imageRect.left);
+
+		return rc;
+
 	}
 
 	@Override
@@ -150,52 +271,59 @@ public class MainActivity extends Activity implements OnTouchListener,
 		case MotionEvent.ACTION_DOWN:
 			currentX = event.getX();
 			currentY = event.getY();
-		break;
+			isMove = true;
+			break;
 		case MotionEvent.ACTION_POINTER_2_DOWN:
 			if (event.getPointerCount() == 2) {
 				lastFingerdis = distanceBetweenFingers(event);
 			}
-
+            isMove = false;
 			break;
 		case MotionEvent.ACTION_MOVE:
-			
+
 			if (event.getPointerCount() == 1) {
 				if (currentY == event.getY() && currentX == event.getX())
 					return true;
 
-				if(isAdjustWL){
+				if (isAdjustWL) {
 					setWL((int) (event.getX() - currentX),
 							(int) (event.getY() - currentY));
-				}else {
-					move((int)(event.getX()-currentX),(int)(event.getY()-currentY));
+				} else {
+					if(isMove && move((int) (event.getX() - currentX),
+							(int) (event.getY() - currentY)))
+					refreshBitmap();
 				}
-				
-	            currentX = event.getX();
-	            currentY = event.getY();
-			}else if (event.getPointerCount() == 2) {
-				
+
+				currentX = event.getX();
+				currentY = event.getY();
+			} else if (event.getPointerCount() == 2) {
+
 				currentFingerdis = distanceBetweenFingers(event);
-				Scale = currentFingerdis > lastFingerdis ? Scale+0.01f:Scale-0.01f;
+				Scale = currentFingerdis > lastFingerdis ? Scale + 0.01f
+						: Scale - 0.01f;
 				if (Scale > 5) {
 					Scale = 5.00f;
-				}else if(Scale < 0.01){
+				} else if (Scale < 0.01) {
 					Scale = 0.01f;
 				}
+				if (scale(Scale)) {
+					refreshBitmap();
+				}
 				displayWLS(windowWidth, windowCenter, Scale);
-				
-			}
-			
-			
-			
-			break;
 
+			}
+
+			break;
+		case MotionEvent.ACTION_UP:
+			isMove = false;
+			break;
 		default:
 			break;
 		}
 
 		return true;
 	}
-	
+
 	/**
 	 * 计算两个手指之间的距离。
 	 * 
@@ -212,7 +340,6 @@ public class MainActivity extends Activity implements OnTouchListener,
 		String string = String.format("W/L:%d/%d    Scale:%.2f", w, c, s);
 		((TextView) findViewById(R.id.WLValue)).setText(string);
 	}
-
 
 	@Override
 	public void onClick(View v) {

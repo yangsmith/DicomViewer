@@ -26,6 +26,7 @@
         android:gravity="center"
         android:text="W/L:0/0  Scale:0.00"/>
     
+   
    <com.dcmViewer.widget.DicomView 
        android:id="@+id/dcmview"
        android:layout_width="fill_parent"

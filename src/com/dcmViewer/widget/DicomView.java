@@ -30,13 +30,18 @@ public class DicomView extends ImageView {
 	}
 
 	public void setColors(int[] colors) {
-		if (this.colors == null) {
-			this.colors = colors;
-		}else{
-			this.colors = colors;
-			invalidate();
-		}
+		if(colors == null)
+			return;
 		
+		this.colors = colors;
+	}
+	
+	public void refreshColors(int[] colors){
+		if(colors == null)
+			return;
+		
+		this.colors = colors;
+		invalidate();
 		
 	}
 	
@@ -59,7 +64,7 @@ public class DicomView extends ImageView {
 		}
 		
 		
-		canvas.drawBitmap(colors, 0, imageWidth, top, left, imageWidth, imageHeight, false, null);
+		canvas.drawBitmap(colors, 0, imageWidth, left, top, imageWidth, imageHeight, false, null);
 	}
 
 }
